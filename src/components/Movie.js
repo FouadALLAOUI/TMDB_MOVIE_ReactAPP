@@ -15,7 +15,7 @@ function Movie() {
         getMovie();
     },[])
 
-    console.log(movieList)
+    //console.log(movieList)
 
   return (
     <div>
