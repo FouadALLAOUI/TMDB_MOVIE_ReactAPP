@@ -4,7 +4,7 @@ function News() {
     const [newsList, setnewsList] = useState([])
 
     const getMovie = () => {
-        fetch("https://api.themoviedb.org/3/discover/movie?api_key=e6f982ddd401b7a5a7a7184e6df5f48d")
+        fetch("http://api.mediastack.com/v1/news?access_key=72476354d30be85a28844ec5abe47d5c")
         .then(res => res.json())
         .then(json => setnewsList(json.results))
     }
