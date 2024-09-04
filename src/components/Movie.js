@@ -20,6 +20,7 @@ function Movie() {
   return (
     <div>
       {movieList.map((movie)=>(
+        // Listing the posters images
         <img alt='' src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
         style={{width:"600px", height:"500px", margin:"5px"}}
         />
