@@ -5,6 +5,7 @@ function Movie() {
     const [movieList, setMovieList] = useState([])
 
     const getMovie = () => {
+        //Fetching the api and get Movies
         fetch("https://api.themoviedb.org/3/discover/movie?api_key=e6f982ddd401b7a5a7a7184e6df5f48d")
         .then(res => res.json())
         .then(json => setMovieList(json.results))
