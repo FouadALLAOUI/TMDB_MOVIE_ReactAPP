@@ -41,3 +41,25 @@ jobs:
           name: production-files
           path: ./dist
 
+  deploy:
+    # Add a dependency to the build job
+    needs: build
+
+    # Specify runner + deployment step
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: production-files
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITACTION_CI_CD_PIPELINE }}
+          publish_dir: ./dist
+
+
+          
