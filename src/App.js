@@ -5,7 +5,7 @@ import News from './components/News';
 function App() {
   return (
     <div>
-      App - Movie
+      App - List Movies
       <Movie/>
       <News/>
     </div>
