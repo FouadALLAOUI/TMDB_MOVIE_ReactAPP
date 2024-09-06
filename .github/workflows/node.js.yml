@@ -10,7 +10,7 @@ on:
 
 jobs:
   # Build Job
-  build:
+  Build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,8 +38,8 @@ jobs:
           name: production-files
           path: ./dist
 
-  deploy:
-    needs: build
+  Deploy:
+    needs: Build
     runs-on: ubuntu-latest
 
     steps:
@@ -51,6 +51,30 @@ jobs:
         with:
           github_token: ${{ secrets.GITACTION_CI_CD_PIPELINE }}
           publish_dir: ./dist
+
+  Push_To_DockerHub:
+    needs: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        id: buildAndPushImage
+        uses: MaximilianoBz/dockerhub-buildpush@v1.0
+        with:
+          registry_url: 'docker.io'
+          repository_name: 'fouadallaoui'
+          user_name: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image_version: 'v1.0'
+          docker_file: '.'
+      - name: Get pre step result output image_pull_url
+        run: echo "The time was ${{ steps.buildAndPushImage.outputs.image_pull_url }}"
+        
+
+
 
 
 
