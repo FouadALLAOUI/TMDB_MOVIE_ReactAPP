@@ -9,9 +9,9 @@ on:
       - master
 
 jobs:
+  # Build Job
   build:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
@@ -32,12 +32,12 @@ jobs:
       - name: Build project
         run: npm run build --if-present
 
-      # Uncomment this line if you want to run tests
-      # - name: Run tests
-      #   run: npm test
+      - name: Build Project
+        run: npm run build
 
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Upload artifact to enable deployment
+        uses: actions/upload-artifact@v3
         with:
-          branch: gh-pages # Specify the branch to deploy to (e.g., gh-pages)
-          folder: build     # The folder to deploy
+          name: production-files
+          path: ./dist
+
