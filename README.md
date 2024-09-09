@@ -21,7 +21,70 @@ jobs:
         uses: actions/checkout@v4
       - name: <start the pipelining>  
 ~~~
- 
+
+EXP : Build & Test NodeJS project
+~~~bash 
+name: Node.js CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 14.x]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - run: npm ci
+      - run: npm run build --if-present
+      - run: npm test
+~~~
+Deploy to ACR :
+~~~bash
+    - uses: actions/checkout@master
+    - uses: Azure/docker-login@v1
+      with:
+        login-server: cloudlifeacr.azurecr.io
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - run: |
+        docker build . -t cloudlifeacr.azurecr.io/k8sflask:${{ github.sha }}
+        docker push cloudlifeacr.azurecr.io/k8sflask:${{ github.sha }}
+~~~
+
+
+Set the target AKS cluster.
+~~~bash
+    - uses: Azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS }}'
+        cluster-name: aksdemokasun
+        resource-group: AKS-Demo-Cluster-RG
+    - uses: Azure/k8s-create-secret@v1
+      with:
+        container-registry-url: cloudlifeacr.azurecr.io
+        container-registry-username: ${{ secrets.ACR_USERNAME }}
+        container-registry-password: ${{ secrets.ACR_PASSWORD }}
+        secret-name: k8s-secret
+    - uses: Azure/k8s-deploy@v1
+      with:
+        manifests: |
+          manifests/deployment.yaml
+          manifests/service.yaml
+        images: |
+          cloudlifeacr.azurecr.io/k8sflask:${{ github.sha }}
+        imagepullsecrets: |
+          k8s-secret
+~~~
 
 ## Run Locally  
 Clone the project  
@@ -161,3 +224,7 @@ The Job of deployment to Azure App Service should not be hardcoded (Use secrets 
         imagepullsecrets: |
           ${{ env.PROJECT_NAME }}
 ~~~
+
+
+
+
