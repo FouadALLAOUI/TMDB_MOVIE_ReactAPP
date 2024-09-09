@@ -1,70 +1,163 @@
-# Getting Started with Create React App
+## The workflow action file :
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+~~~bash
+name : "Name of the pipeline"
 
-## Available Scripts
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: <start the pipelining>  
+~~~
+ 
 
-In the project directory, you can run:
+## Run Locally  
+Clone the project  
 
-### `npm start`
+~~~bash  
+  az ad sp create-for-rbac \
+    --name "ghActionAzureVote" \
+    --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP> \
+    --role Contributor \
+    --json-auth
+~~~
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Copy the Outpuy
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+~~~bash  
+  {
+  "clientId": <clientId>,
+  "clientSecret": <clientSecret>,
+  "subscriptionId": <subscriptionId>,
+  "tenantId": <tenantId>,
+  ...
+  }
+~~~
 
-### `npm test`
+### Add the output in secrets as azure credentiales 
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Create an Azure App Service plan :
+~~~bash  
+az appservice plan create \
+   --resource-group MY_RESOURCE_GROUP \
+   --name MY_APP_SERVICE_PLAN \
+   --is-linux
+~~~
 
-### `npm run build`
+Create a web app :
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+~~~bash  
+az webapp create \
+    --name MY_WEBAPP_NAME \
+    --plan MY_APP_SERVICE_PLAN \
+    --resource-group MY_RESOURCE_GROUP \
+    --runtime "NODE|14-lts"
+~~~  
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Exemple for the build Job: 
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+~~~bash
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-### `npm run eject`
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+    - name: npm install, build, and test
+      run: |
+        npm install
+        npm run build --if-present
+        npm run test --if-present
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: node-app
+        path: .
+~~~
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The Job of deployment to Azure App Service should not be hardcoded (Use secrets & environments variables) :
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+~~~bash
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+    steps:
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: node-app
 
-## Learn More
+    - name: 'Deploy to Azure WebApp'
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@85270a1854658d167ab239bce43949edb336fa7c
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+~~~
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### To deploy it into AKS
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+~~~bash
+    - name: Azure Login
+      uses: azure/login@14a755a4e2fd6dff25794233def4f2cf3f866955
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-### Code Splitting
+    - name: Build image on ACR
+      uses: azure/CLI@61bb69d64d613b52663984bf12d6bac8fd7b3cc8
+      with:
+        azcliversion: 2.29.1
+        inlineScript: |
+          az configure --defaults acr=${{ env.AZURE_CONTAINER_REGISTRY }}
+          az acr build -t  -t ${{ env.REGISTRY_URL }}/${{ env.PROJECT_NAME }}:${{ github.sha }}
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+    - name: Gets K8s context
+      uses: azure/aks-set-context@94ccc775c1997a3fcfbfbce3c459fec87e0ab188
+      with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          resource-group: ${{ env.RESOURCE_GROUP }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+      id: login
 
-### Analyzing the Bundle Size
+    - name: Configure deployment
+      uses: azure/k8s-bake@61041e8c2f75c1f01186c8f05fb8b24e1fc507d8
+      with:
+        renderEngine: 'helm'
+        helmChart: ${{ env.CHART_PATH }}
+        overrideFiles: ${{ env.CHART_OVERRIDE_PATH }}
+        overrides: |
+          replicas:2
+        helm-version: 'latest'
+      id: bake
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+    - name: Deploys application
+      uses: Azure/k8s-deploy@dd4bbd13a5abd2fc9ca8bdcb8aee152bb718fa78
+      with:
+        manifests: ${{ steps.bake.outputs.manifestsBundle }}
+        images: |
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.PROJECT_NAME }}:${{ github.sha }}
+        imagepullsecrets: |
+          ${{ env.PROJECT_NAME }}
+~~~
