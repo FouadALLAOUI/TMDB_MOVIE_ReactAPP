@@ -1,29 +1,19 @@
-FROM node:alpine as builder
+FROM node:lts-alpine
 
-WORKDIR /app
+ENV NODE_ENV=production
 
-COPY package*.json .
+WORKDIR /usr/src/app
 
-RUN npm install
+COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]
+
+RUN npm install --production --silent && mv node_modules ../
 
 COPY . .
 
-RUN npm run build
-
 EXPOSE 3000
 
-CMD [ "npm", "start" ]
+RUN chown -R node /usr/src/app
 
-#------------------------------
+USER node
 
-#FROM nginx:latest
-#
-#WORKDIR /usr/share/nginx/html
-#
-#RUN rm -rf ./*
-#
-#COPY --from=builder /app/build .
-#
-#ENTRYPOINT ["nginx", "-g", "daemon off;"]
-
-
+CMD ["npm", "start"]
